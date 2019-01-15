@@ -17,11 +17,45 @@ enum Relop : int
     Lesser
 };
 
+inline std::string relopSymbol(Relop op) {
+    switch(op){
+        case NotEqual:
+            return "jne";
+            break;
+        case LesserEqual:
+            return "jle";
+            break;
+        case GreaterEqual:
+            return "jge";
+            break;
+        case Greater:
+            return "jg";
+            break;
+        case Equal:
+            return "je";
+            break;
+        case Lesser:
+            return "jl";
+            break;
+        }
+}
+
 enum Sign : int
 {
     Positive,
     Negative
 };
+
+inline std::string signSymbol(Sign si) {
+    switch(si){
+        case Positive:
+            return "add";
+            break;
+        case Negative:
+            return "sub";
+            break;
+        }
+}
 
 // horrible unscoped enum because yylval has to be an int
 enum Mulop : int
@@ -32,6 +66,26 @@ enum Mulop : int
     Modulo,
     And
 };
+
+inline std::string mulopSymbol(Mulop op) {
+    switch(op){
+        case Multiply:
+            return "mul";
+            break;
+        case Divide:
+            return "div";
+            break;
+        case Div:
+            return "div";
+            break;
+        case Modulo:
+            return "mod";
+            break;
+        case And:
+            return "and";
+            break;
+        }
+}
 
 enum class Type : int
 {
@@ -61,11 +115,13 @@ public:
   int getSize(Symbol& sym);
   int calculateAddress(bool global, int pos);
   int insertTemp(bool global, Type type);
+  int insertLabel();
   void print();
 
 private:
   std::vector<Symbol> symbols;
   int tempCounter {0};
+  int labelCounter {0};
 };
 
 extern SymbolTable symtable;

@@ -95,6 +95,14 @@ int SymbolTable::insertTemp(bool global, Type type) {
   return pos;
 }
 
+int SymbolTable::insertLabel() {
+  Symbol sym;
+  sym.id = "label" + std::to_string(labelCounter++);
+  sym.token = IF;
+  sym.global = true;
+  return this->insert(sym);
+}
+
 void SymbolTable::print() {
   std::cerr << "\n";
   std::cerr

@@ -14,8 +14,8 @@ inline void yyerror (char const *s) {
 SymbolTable symtable;
 
 std::vector<int> identifiers;
-volatile bool isGlobal = true;
 std::stringstream buffer;
+volatile bool isGlobal = true;
 volatile int localSize = 0;
 
 int callMethod(Symbol& sym);
@@ -254,9 +254,23 @@ statement:
     |
     compound_statement
     |
-    IF expression THEN statement ELSE statement
+    IF expression {
+
+    } THEN statement {
+
+    } ELSE statement {
+
+    }
     |
-    WHILE expression DO statement
+    WHILE {
+
+    }
+    expression DO {
+
+    }
+    statement {
+
+    }
     ;
 
 variable:
@@ -266,9 +280,13 @@ variable:
     ;
 
 procedure_statement:
-    ID
+    ID {
+
+    }
     |
-    ID '(' expression_list ')'
+    ID '(' expression_list ')' {
+
+    }
     ;
 
 expression_list:
@@ -284,24 +302,54 @@ expression_list:
 expression:
     simple_expression
     |
-    simple_expression RELOP simple_expression
+    simple_expression RELOP simple_expression {
+
+    }
     ;
 
 simple_expression:
     term
     |
-    SIGN term
+    SIGN term {
+
+    }
     |
-    simple_expression SIGN term
+    simple_expression SIGN term {
+
+    }
     |
-    simple_expression OR term
+    simple_expression OR term {
+
+    }
     ;
 
 term:
     factor
     |
     term MULOP factor {
-
+        int lhs = $1;
+        int rhs = $3;
+        if(symtable.at($1).type == Type::Real || symtable.at($3).type == Type::Real) {
+            $$ = symtable.insertTemp(isGlobal, Type::Real);
+            if(symtable.at(lhs).type == Type::Integer) {
+                int temp = symtable.insertTemp(isGlobal, Type::Real);
+                emitAssignment(temp, lhs);
+                lhs = temp;
+            }
+            else {
+                int temp = symtable.insertTemp(isGlobal, Type::Real);
+                emitAssignment(temp, rhs);
+                rhs = temp;
+            }
+        }
+        else
+            $$ = symtable.insertTemp(isGlobal, Type::Integer);
+    
+        buffer << mulopSymbol(static_cast<Mulop>($2)) << typeSuffix(symtable.at($$).type) << " "
+        << toAddress(symtable.at(lhs)) << " "
+        << toAddress(symtable.at(rhs)) << " "
+        << toAddress(symtable.at($$))
+        << "\n";
     }
     ;
 
@@ -339,7 +387,26 @@ factor:
     }
     |
     NOT factor {
-        // $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
+        $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
+        int isZero = symtable.insertLabel();
+        int afterZero = symtable.insertLabel();
+        switch (symtable.at($2).type) {
+            case Type::Integer:
+                buffer << "je.i #0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "mov.i #0," << $$ << "\n";
+            case Type::Real:
+                buffer << "je.r #0.0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "mov.r #0.0," << $$ << "\n";
+        }
+        buffer << "jump #" << symtable.at(afterZero).id << "\n";
+        buffer << "#" << symtable.at(isZero).id << ":" << "\n";
+        switch (symtable.at($2).type) {
+            case Type::Integer:
+                buffer << "mov.i #1," << $$ << "\n";
+            case Type::Real:
+                buffer << "mov.r #1.0," << $$ << "\n";
+        }
+        buffer << "#" << symtable.at(afterZero).id << ":" << "\n";
     }
     ;
 
