@@ -4,6 +4,7 @@
 #include "parser.hpp"
 #include "symbol.hpp"
 #include <cstdlib> // atof()
+extern volatile bool isGlobal;
 %}
 
 comment             \{[^\{]*\}
@@ -111,6 +112,7 @@ default             [\(\)\,\;\:\.\[\]]{1}
                       Symbol sym;
                       sym.id = std::string(yytext);
                       sym.token = ID;
+                      sym.global = isGlobal;
                       yylval = symtable.insert(sym);
                     }
                     return ID;
