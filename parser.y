@@ -527,8 +527,11 @@ int callMethod(Symbol& sym) {
             emitAssignment(pos, identifiers.at(i));
             index = pos;
         }
-        buffer << "\t" << "push.i #"
-            << toAddress(symtable.at(index))
+        std::string addr = (symtable.at(index).reference) ? 
+                toAddress(symtable.at(index)).substr(1) : 
+                "#" + toAddress(symtable.at(index));
+        buffer << "\t" << "push.i "
+            << addr
             << "\n";
         ++pushCounter;
     }
