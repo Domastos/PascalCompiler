@@ -14,6 +14,7 @@ inline void yyerror (char const *s) {
 SymbolTable symtable;
 
 std::vector<int> identifiers;
+std::vector<int> paramIdentifiers;
 std::stringstream buffer;
 volatile bool isGlobal = true;
 volatile int localSize = 0;
@@ -175,13 +176,20 @@ subprogram_head:
     ;
 
 arguments:
-    '(' parameter_list ')'
+    '(' parameter_list ')'  {
+        std::reverse(std::begin(paramIdentifiers), std::end(paramIdentifiers));
+        int paramsCounter = 0;
+        for (auto& i : paramIdentifiers) {
+            symtable.at(i).address = 12 + (paramsCounter * 4);
+            ++paramsCounter;
+        }
+        paramIdentifiers.clear();
+    }
     |
     ;
 
 parameter_list:
-    identifier_list ':' type{
-        int paramsCounter  = 0;
+    identifier_list ':' type {
         for (auto& i : identifiers) {
             switch($3) {
                 case INTEGER:
@@ -196,16 +204,14 @@ parameter_list:
                     yyerror("INVALID TYPE");
             }
             symtable.at(i).reference = true;
-            symtable.at(i).address = 12 + paramsCounter * 4;
-            ++paramsCounter;
             symtable.at(i).global = false;
             symtable.at($-1).arguments.push_back(symtable.at(i).type); // $-1 = ID
+            paramIdentifiers.push_back(i);
         }
         identifiers.clear();
     }
     |
     parameter_list ';' identifier_list ':' type {
-        int paramsCounter  = 0;
         for (auto& i : identifiers) {
             switch($5) {
                 case INTEGER:
@@ -220,10 +226,9 @@ parameter_list:
                     yyerror("INVALID TYPE");
             }
             symtable.at(i).reference = true;
-            symtable.at(i).address = 12 + paramsCounter * 4;
-            ++paramsCounter;
             symtable.at(i).global = false;
             symtable.at($-1).arguments.push_back(symtable.at(i).type);
+            paramIdentifiers.push_back(i);
         }
         identifiers.clear();
     }
@@ -312,15 +317,13 @@ procedure_statement:
         if(symtable.at($1).token == FUNCTION || symtable.at($1).token == PROCEDURE) {
             if(symtable.at($1).arguments.size() > 0)
                 yyerror("FUNCTION HAS ARGS");
+        }
 
-            $$ = symtable.insertTemp(isGlobal, symtable.at($1).type);
-            buffer << "\t" << "push.i "
-            << toAddress(symtable.at($$))
-            << "\n";
-            buffer << "\t" << "call.i "
-            << "#" << symtable.at($1).id
-            << "\n";
-            buffer << "\t" << "incsp.i #4\n";
+        if(symtable.at($1).token == FUNCTION) {
+            $$ = callMethod(symtable.at($1));
+        }
+        else if (symtable.at($1).token == PROCEDURE) {
+            callMethod(symtable.at($1));
         }
         else
             yyerror("NOT PROCEDURE OR FUNCTION");
@@ -392,7 +395,7 @@ expression:
         << toAddress(symtable.at(rhs)) << ","
         << "#" << symtable.at(isTrue).id
         << "\n";
-        switch (symtable.at($2).type) {
+        switch (symtable.at($3).type) {
             case Type::Integer:
                 buffer << "\t" << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
                 break;
@@ -402,7 +405,7 @@ expression:
         }
         buffer << "\t" << "jump.i #" << symtable.at(afterTrue).id << "\n";
         buffer << symtable.at(isTrue).id << ":" << "\n";
-        switch (symtable.at($2).type) {
+        switch (symtable.at($3).type) {
             case Type::Integer:
                 buffer << "\t" << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
                 break;
@@ -457,17 +460,10 @@ factor:
             if(symtable.at($1).arguments.size() > 0)
                 yyerror("FUNCTION HAS ARGS");
 
-            $$ = symtable.insertTemp(isGlobal, symtable.at($1).type);
-            buffer << "\t" << "push.i "
-            << toAddress(symtable.at($$))
-            << "\n";
-            buffer << "\t" << "call.i "
-            << "#" << symtable.at($1).id
-            << "\n";
-            buffer << "\t" << "incsp.i #4\n";
+            $$ = callMethod(symtable.at($1));
         }
-        // if actual variable just propagate
-        $$ = $1;
+        else // if actual variable just propagate
+            $$ = $1;
     }
     |
     ID '(' expression_list ')' {
@@ -488,11 +484,13 @@ factor:
         int afterZero = symtable.insertLabel();
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "\t" << "je.i #0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "\t" << "je.i #0," << toAddress(symtable.at($2)) << ","
+                << "#" << symtable.at(0).id << "\n";
                 buffer << "\t" << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "\t" << "je.r #0.0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "\t" << "je.r #0.0," << toAddress(symtable.at($2))  << ","
+                << "#" << symtable.at(0).id << "\n";
                 buffer << "\t" << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
@@ -524,8 +522,11 @@ int callMethod(Symbol& sym) {
             emitAssignment(pos, identifiers.at(i));
             index = pos;
         }
-        if (symtable.at(index).type != sym.arguments.at(i)) 
-            yyerror("TYPE MISMATCH");
+        if (symtable.at(index).type != sym.arguments.at(i)) {
+            int pos = symtable.insertTemp(isGlobal, sym.arguments.at(i));
+            emitAssignment(pos, identifiers.at(i));
+            index = pos;
+        }
         buffer << "\t" << "push.i #"
             << toAddress(symtable.at(index))
             << "\n";
@@ -545,7 +546,8 @@ int callMethod(Symbol& sym) {
     buffer << "\t" << "call.i "
         << "#" << sym.id
         << "\n";
-    buffer << "\t" << "incsp.i #"<< std::to_string(pushCounter*4) <<"\n";
+    if(pushCounter)
+        buffer << "\t" << "incsp.i #"<< std::to_string(pushCounter*4) <<"\n";
     return resultPos;
 }
 
@@ -561,7 +563,7 @@ void emitAssignment(int lhs, int rhs) {
     else {
         if(symtable.at(lhs).type == Type::Integer)
             buffer << "\t" << "realtoint"
-            << typeSuffix(symtable.at(lhs).type)
+            << typeSuffix(symtable.at(rhs).type)
             << " "
             << toAddress(symtable.at(rhs))
             << ","
@@ -569,7 +571,7 @@ void emitAssignment(int lhs, int rhs) {
             << "\n";
         else 
             buffer << "\t" << "inttoreal"
-            << typeSuffix(symtable.at(lhs).type)
+            << typeSuffix(symtable.at(rhs).type)
             << " "
             << toAddress(symtable.at(rhs))
             << ","
