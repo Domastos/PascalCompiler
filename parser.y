@@ -52,7 +52,7 @@ int emitExpression(std::string op, int lhs, int rhs);
 program:
     PROGRAM ID '(' identifier_list ')' ';'{
         isGlobal = true;
-        std::cout << "jump.i #" + symtable.at($1).id <<"\n";
+        std::cout << "\t" << "jump.i #" + symtable.at($1).id <<"\n";
         identifiers.clear();
     }
     declarations
@@ -66,7 +66,7 @@ program:
         }
     }
     '.' {
-        std::cout << "exit" << "\n";
+        std::cout << "\t" << "exit" << "\n";
         symtable.print();
     }
     ;
@@ -125,14 +125,14 @@ subprogram_declaration:
     subprogram_head
     declarations
     compound_statement {
-        std::cout << "enter.i #" << localSize << "\n";
+        std::cout << "\t" << "enter.i #" << localSize << "\n";
         localSize = 0;
         if(buffer.str().size()) {
             std::cout << buffer.rdbuf();
             std::stringstream().swap(buffer);
         }
-        std::cout << "leave" << "\n";
-        std::cout << "return" << "\n";
+        std::cout << "\t" << "leave" << "\n";
+        std::cout << "\t" << "return" << "\n";
         symtable.print();
         symtable.cleanLocal();
         isGlobal = true;
@@ -257,12 +257,11 @@ statement:
     |
     IF expression {
         $1 = symtable.insertLabel(); // end of then
-        $$ = symtable.insertLabel(); // end of else
 
         std::string zero = (symtable.at($2).type == Type::Real) ?
                                 std::string("#0.0") : 
                                 std::string("#0");
-        buffer << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($2).type) 
+        buffer << "\t" << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($2).type) 
                 << " "
                 << zero
                 << ","
@@ -271,33 +270,34 @@ statement:
                 << "#" << symtable.at($1).id
                 << "\n";
     } THEN statement {
-        buffer << "jump #" << symtable.at($$).id << "\n"; // skip else
-        buffer << "#" << symtable.at($1).id << ":" << "\n";
+        $4 = symtable.insertLabel(); // end of else
+        buffer << "\t" << "jump.i #" << symtable.at($4).id << "\n"; // skip else
+        buffer << symtable.at($1).id << ":" << "\n";
     } ELSE statement {
-        buffer << "#" << symtable.at($$).id << ":" << "\n";
+        buffer << symtable.at($4).id << ":" << "\n";
     }
     |
     WHILE {
         $1 = symtable.insertLabel(); // start
-        $$ = symtable.insertLabel(); // end
-        buffer << "#" << symtable.at($1).id << ":" << "\n";
+        buffer << symtable.at($1).id << ":" << "\n";
     }
     expression DO {
-        std::string zero = (symtable.at($2).type == Type::Real) ?
+        $4 = symtable.insertLabel(); // end
+        std::string zero = (symtable.at($3).type == Type::Real) ?
                                 std::string("#0.0") : 
                                 std::string("#0");
-        buffer << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($2).type) 
+        buffer << "\t" << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($3).type) 
                 << " "
                 << zero
                 << ","
-                << toAddress(symtable.at($2))
+                << toAddress(symtable.at($3))
                 << ","
-                << "#" << symtable.at($$).id
+                << "#" << symtable.at($4).id
                 << "\n";
     }
     statement {
-        buffer << "jump #" << symtable.at($1).id << "\n"; // back to start
-        buffer << "#" << symtable.at($$).id << ":" << "\n"; // end
+        buffer << "\t" << "jump.i #" << symtable.at($1).id << "\n"; // back to start
+        buffer << symtable.at($4).id << ":" << "\n"; // end
     }
     ;
 
@@ -314,13 +314,13 @@ procedure_statement:
                 yyerror("FUNCTION HAS ARGS");
 
             $$ = symtable.insertTemp(isGlobal, symtable.at($1).type);
-            buffer << "push.i "
+            buffer << "\t" << "push.i "
             << toAddress(symtable.at($$))
             << "\n";
-            buffer << "call.i "
+            buffer << "\t" << "call.i "
             << "#" << symtable.at($1).id
             << "\n";
-            buffer << "incsp.i #4\n";
+            buffer << "\t" << "incsp.i #4\n";
         }
         else
             yyerror("NOT PROCEDURE OR FUNCTION");
@@ -329,14 +329,14 @@ procedure_statement:
     ID '(' expression_list ')' {
         if($1 == symtable.lookup("write")) {
             for(auto& i : identifiers) {
-                buffer << "write" << typeSuffix(symtable.at(i).type) << " "
+                buffer << "\t" << "write" << typeSuffix(symtable.at(i).type) << " "
                 << toAddress(symtable.at(i))
                 << "\n";
             }
         } 
         else if ($1 == symtable.lookup("read")){
             for(auto& i : identifiers) {
-                buffer << "read" << typeSuffix(symtable.at(i).type) << " "
+                buffer << "\t" << "read" << typeSuffix(symtable.at(i).type) << " "
                 << toAddress(symtable.at(i))
                 << "\n";
             }
@@ -387,30 +387,30 @@ expression:
 
         int isTrue = symtable.insertLabel();
         int afterTrue = symtable.insertLabel();
-        buffer << relopSymbol(static_cast<Relop>($2)) << typeSuffix(symtable.at($$).type) << " "
+        buffer << "\t" << relopSymbol(static_cast<Relop>($2)) << typeSuffix(symtable.at($$).type) << " "
         << toAddress(symtable.at(lhs)) << ","
         << toAddress(symtable.at(rhs)) << ","
         << "#" << symtable.at(isTrue).id
         << "\n";
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
-        buffer << "jump #" << symtable.at(afterTrue).id << "\n";
-        buffer << "#" << symtable.at(isTrue).id << ":" << "\n";
+        buffer << "\t" << "jump.i #" << symtable.at(afterTrue).id << "\n";
+        buffer << symtable.at(isTrue).id << ":" << "\n";
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
-        buffer << "#" << symtable.at(afterTrue).id << ":" << "\n";
+        buffer << symtable.at(afterTrue).id << ":" << "\n";
     }
     ;
 
@@ -422,9 +422,11 @@ simple_expression:
             $$ = $2;
         else {
             $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
-            buffer << signSymbol(static_cast<Sign>($1)) << typeSuffix(symtable.at($$).type) << " "
+            buffer << "\t" << signSymbol(static_cast<Sign>($1)) << typeSuffix(symtable.at($$).type) 
+            << " "
             << "#0,"
-            << toAddress(symtable.at($2)) << ","
+            << toAddress(symtable.at($2)) 
+            << ","
             << toAddress(symtable.at($$))
             << "\n";
         }
@@ -456,13 +458,13 @@ factor:
                 yyerror("FUNCTION HAS ARGS");
 
             $$ = symtable.insertTemp(isGlobal, symtable.at($1).type);
-            buffer << "push.i "
+            buffer << "\t" << "push.i "
             << toAddress(symtable.at($$))
             << "\n";
-            buffer << "call.i "
+            buffer << "\t" << "call.i "
             << "#" << symtable.at($1).id
             << "\n";
-            buffer << "incsp.i #4\n";
+            buffer << "\t" << "incsp.i #4\n";
         }
         // if actual variable just propagate
         $$ = $1;
@@ -486,25 +488,25 @@ factor:
         int afterZero = symtable.insertLabel();
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "je.i #0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
-                buffer << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "je.i #0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "\t" << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "je.r #0.0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
-                buffer << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "je.r #0.0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "\t" << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
-        buffer << "jump #" << symtable.at(afterZero).id << "\n";
-        buffer << "#" << symtable.at(isZero).id << ":" << "\n";
+        buffer << "\t" << "jump.i #" << symtable.at(afterZero).id << "\n";
+        buffer << symtable.at(isZero).id << ":" << "\n";
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
+                buffer << "\t" << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
-        buffer << "#" << symtable.at(afterZero).id << ":" << "\n";
+        buffer << symtable.at(afterZero).id << ":" << "\n";
     }
     ;
 
@@ -524,7 +526,7 @@ int callMethod(Symbol& sym) {
         }
         if (symtable.at(index).type != sym.arguments.at(i)) 
             yyerror("TYPE MISMATCH");
-        buffer << "push.i #"
+        buffer << "\t" << "push.i #"
             << toAddress(symtable.at(index))
             << "\n";
         ++pushCounter;
@@ -532,7 +534,7 @@ int callMethod(Symbol& sym) {
     int resultPos = -1;
     if(sym.token == FUNCTION) {
         int pos = symtable.insertTemp(isGlobal, sym.type);
-        buffer << "push.i #"
+        buffer << "\t" << "push.i #"
             << toAddress(symtable.at(pos))
             << "\n";
         ++pushCounter;
@@ -540,16 +542,16 @@ int callMethod(Symbol& sym) {
     }
 
     identifiers.clear();
-    buffer << "call.i "
+    buffer << "\t" << "call.i "
         << "#" << sym.id
         << "\n";
-    buffer << "incsp.i #"<< std::to_string(pushCounter*4) <<"\n";
+    buffer << "\t" << "incsp.i #"<< std::to_string(pushCounter*4) <<"\n";
     return resultPos;
 }
 
 void emitAssignment(int lhs, int rhs) {
     if(symtable.at(lhs).type == symtable.at(rhs).type)
-            buffer << "mov"
+            buffer << "\t" << "mov"
             << typeSuffix(symtable.at(lhs).type)
             << " "
             << toAddress(symtable.at(rhs))
@@ -558,7 +560,7 @@ void emitAssignment(int lhs, int rhs) {
             << "\n";
     else {
         if(symtable.at(lhs).type == Type::Integer)
-            buffer << "realtoint"
+            buffer << "\t" << "realtoint"
             << typeSuffix(symtable.at(lhs).type)
             << " "
             << toAddress(symtable.at(rhs))
@@ -566,7 +568,7 @@ void emitAssignment(int lhs, int rhs) {
             << toAddress(symtable.at(lhs))
             << "\n";
         else 
-            buffer << "inttoreal"
+            buffer << "\t" << "inttoreal"
             << typeSuffix(symtable.at(lhs).type)
             << " "
             << toAddress(symtable.at(rhs))
@@ -594,7 +596,7 @@ int emitExpression(std::string op, int lhs, int rhs) {
     else
         dst = symtable.insertTemp(isGlobal, Type::Integer);
 
-    buffer << op << typeSuffix(symtable.at(dst).type) << " "
+    buffer << "\t" << op << typeSuffix(symtable.at(dst).type) << " "
     << toAddress(symtable.at(lhs)) << ","
     << toAddress(symtable.at(rhs)) << ","
     << toAddress(symtable.at(dst))
