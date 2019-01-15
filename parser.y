@@ -349,7 +349,7 @@ expression:
                 emitAssignment(temp, lhs);
                 lhs = temp;
             }
-            else {
+            else if(symtable.at(rhs).type == Type::Integer) {
                 int temp = symtable.insertTemp(isGlobal, Type::Real);
                 emitAssignment(temp, rhs);
                 rhs = temp;
@@ -558,7 +558,7 @@ int emitExpression(std::string op, int lhs, int rhs) {
             emitAssignment(temp, lhs);
             lhs = temp;
         }
-        else {
+        else if (symtable.at(rhs).type == Type::Integer) {
             int temp = symtable.insertTemp(isGlobal, Type::Real);
             emitAssignment(temp, rhs);
             rhs = temp;
