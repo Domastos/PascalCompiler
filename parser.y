@@ -282,11 +282,47 @@ variable:
 
 procedure_statement:
     ID {
+        if(symtable.at($1).token == FUNCTION || symtable.at($1).token == PROCEDURE) {
+            if(symtable.at($1).arguments.size() > 0)
+                yyerror("FUNCTION HAS ARGS");
 
+            $$ = symtable.insertTemp(isGlobal, symtable.at($1).type);
+            buffer << "push.i "
+            << toAddress(symtable.at($$))
+            << "\n";
+            buffer << "call.i "
+            << "#" << symtable.at($1).id
+            << "\n";
+            buffer << "incsp.i #4\n";
+        }
+        else
+            yyerror("NOT PROCEDURE OR FUNCTION");
     }
     |
     ID '(' expression_list ')' {
-
+        if($1 == symtable.lookup("write")) {
+            for(auto& i : identifiers) {
+                buffer << "write" << typeSuffix(symtable.at(i).type) << " "
+                << toAddress(symtable.at(i))
+                << "\n";
+            }
+        } 
+        else if ($1 == symtable.lookup("read")){
+            for(auto& i : identifiers) {
+                buffer << "read" << typeSuffix(symtable.at(i).type) << " "
+                << toAddress(symtable.at(i))
+                << "\n";
+            }
+        }
+        else if(symtable.at($1).token == FUNCTION) {
+            $$ = callMethod(symtable.at($1));
+        }
+        else if (symtable.at($1).token == PROCEDURE) {
+            callMethod(symtable.at($1));
+        }
+        else
+            yyerror("NOT PROCEDURE OR FUNCTION");
+        identifiers.clear();
     }
     ;
 
