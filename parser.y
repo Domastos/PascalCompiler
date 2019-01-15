@@ -151,10 +151,10 @@ subprogram_head:
         }
         std::cout << symtable.at($2).id << ":" << "\n";
         // DEBUG
-        std::cerr << symtable.at($2).id << " ";
+        std::cerr << symtable.at($2).id << " ( ";
         for(auto i: symtable.at($2).arguments) 
             std::cerr << static_cast<int>(i) << " ";
-        std::cerr << "-> " << static_cast<int>(symtable.at($2).type);
+        std::cerr << ") -> " << static_cast<int>(symtable.at($2).type);
         std::cerr << "\n";
     }
     |
@@ -163,11 +163,10 @@ subprogram_head:
         symtable.at($2).token = PROCEDURE;
         std::cout << symtable.at($2).id << ":" << "\n";
         // DEBUG
-        std::cerr << symtable.at($2).id << " ";
+        std::cerr << symtable.at($2).id << " ( ";
         for(auto i: symtable.at($2).arguments) 
             std::cerr << static_cast<int>(i) << " ";
-        std::cerr << "-> " << static_cast<int>(symtable.at($2).type);
-        std::cerr << "\n";
+        std::cerr << ")\n";
     }
     ;
 
@@ -244,7 +243,34 @@ statement_list:
     ;
 
 statement:
-    variable ASSIGNOP expression
+    variable ASSIGNOP expression {
+        if(symtable.at($1).type == symtable.at($3).type)
+            buffer << "mov"
+            << typeSuffix(symtable.at($1).type)
+            << " "
+            << toAddress(symtable.at($3))
+            << ","
+            << toAddress(symtable.at($1))
+            << "\n";
+        else {
+            if(symtable.at($1).type == Type::Integer)
+                buffer << "realtoint"
+                << typeSuffix(symtable.at($1).type)
+                << " "
+                << toAddress(symtable.at($3))
+                << ","
+                << toAddress(symtable.at($1))
+                << "\n";
+            else 
+                buffer << "inttoreal"
+                << typeSuffix(symtable.at($1).type)
+                << " "
+                << toAddress(symtable.at($3))
+                << ","
+                << toAddress(symtable.at($1))
+                << "\n";
+        }
+    }
     |
     procedure_statement
     |
@@ -292,19 +318,29 @@ simple_expression:
 term:
     factor
     |
-    term MULOP factor
+    term MULOP factor {
+        
+    }
     ;
 
 factor:
-    variable
+    variable {
+
+    }
     |
-    ID '(' expression_list ')'
+    ID '(' expression_list ')' {
+
+    }
     |
     NUM
     |
-    '(' expression ')'
+    '(' expression ')' {
+        $$ = $2;
+    }
     |
-    NOT factor
+    NOT factor {
+
+    }
     ;
 
 %%
