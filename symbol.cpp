@@ -43,6 +43,7 @@ void SymbolTable::cleanLocal()
   symbols.erase(std::remove_if(std::begin(symbols), std::end(symbols),
                  [](Symbol &elem) { return !elem.global; }),
                  std::end(symbols));
+  tempCounter = 0;
 }
 
 Symbol& SymbolTable::at(int i)
@@ -63,7 +64,7 @@ int SymbolTable::calculateAddress(bool global, int pos) {
   if (global)
   {
     auto top = std::max_element(std::begin(symbols), std::end(symbols), [](auto &a,auto &b) {
-      if (!a.global || a.type == Type::Undefined)
+      if (!a.global || a.type == Type::Undefined || a.token == FUNCTION)
         return true;
       return a.address < b.address;
     });
@@ -73,7 +74,7 @@ int SymbolTable::calculateAddress(bool global, int pos) {
   }
   else {
     auto top = std::min_element(std::begin(symbols), std::end(symbols), [](auto &a,auto &b) {
-    if (b.global || b.type == Type::Undefined)
+    if (b.global || b.type == Type::Undefined  || b.token == FUNCTION)
       return true;
     return a.address < b.address;
   });
@@ -81,6 +82,17 @@ int SymbolTable::calculateAddress(bool global, int pos) {
       return -1 * getSize(symbols.at(pos));
     return (*top).address - getSize(symbols.at(pos));
   }
+}
+
+int SymbolTable::insertTemp(bool global, Type type) {
+  Symbol sym;
+  sym.id = "t" + std::to_string(tempCounter++);
+  sym.token = ID;
+  sym.global = global;
+  sym.type = type;
+  int pos = this->insert(sym);
+  symbols.at(pos).address = calculateAddress(global, pos);
+  return pos;
 }
 
 void SymbolTable::print() {
