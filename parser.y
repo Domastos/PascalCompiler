@@ -300,7 +300,7 @@ factor:
     |
     ID '(' expression_list ')'
     |
-    NUM {symtable.at($1).global = isGlobal;}
+    NUM
     |
     '(' expression ')'
     |

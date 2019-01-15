@@ -102,6 +102,7 @@ default             [\(\)\,\;\:\.\[\]]{1}
                       else
                         sym.type = Type::Integer;
                       sym.token = NUM;
+                      sym.global = isGlobal;
                       yylval = symtable.insert(sym);
                     }
                     return NUM;
