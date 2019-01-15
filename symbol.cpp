@@ -92,6 +92,7 @@ int SymbolTable::insertTemp(bool global, Type type) {
   sym.type = type;
   int pos = this->insert(sym);
   symbols.at(pos).address = calculateAddress(global, pos);
+  localSize += getSize(symbols.at(pos));
   return pos;
 }
 

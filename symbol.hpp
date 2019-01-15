@@ -125,6 +125,7 @@ private:
 };
 
 extern SymbolTable symtable;
+extern volatile int localSize;
 
 inline std::string typeSuffix(Type type) {
     switch(type) {

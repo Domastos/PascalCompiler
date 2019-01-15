@@ -340,7 +340,50 @@ expression:
     simple_expression
     |
     simple_expression RELOP simple_expression {
+        int lhs = $1;
+        int rhs = $3;
+        if(symtable.at(lhs).type == Type::Real || symtable.at(rhs).type == Type::Real) {
+            $$ = symtable.insertTemp(isGlobal, Type::Real);
+            if(symtable.at(lhs).type == Type::Integer) {
+                int temp = symtable.insertTemp(isGlobal, Type::Real);
+                emitAssignment(temp, lhs);
+                lhs = temp;
+            }
+            else {
+                int temp = symtable.insertTemp(isGlobal, Type::Real);
+                emitAssignment(temp, rhs);
+                rhs = temp;
+            }
+        }
+        else
+            $$ = symtable.insertTemp(isGlobal, Type::Integer);
 
+        int isTrue = symtable.insertLabel();
+        int afterTrue = symtable.insertLabel();
+        buffer << relopSymbol(static_cast<Relop>($2)) << typeSuffix(symtable.at($$).type) << " "
+        << toAddress(symtable.at(lhs)) << " "
+        << toAddress(symtable.at(rhs)) << " "
+        << "#" << symtable.at(isTrue).id
+        << "\n";
+        switch (symtable.at($2).type) {
+            case Type::Integer:
+                buffer << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
+                break;
+            case Type::Real:
+                buffer << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
+                break;
+        }
+        buffer << "jump #" << symtable.at(afterTrue).id << "\n";
+        buffer << "#" << symtable.at(isTrue).id << ":" << "\n";
+        switch (symtable.at($2).type) {
+            case Type::Integer:
+                buffer << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
+                break;
+            case Type::Real:
+                buffer << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
+                break;
+        }
+        buffer << "#" << symtable.at(afterTrue).id << ":" << "\n";
     }
     ;
 
@@ -417,18 +460,22 @@ factor:
         switch (symtable.at($2).type) {
             case Type::Integer:
                 buffer << "je.i #0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
-                buffer << "mov.i #0," << $$ << "\n";
+                buffer << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
+                break;
             case Type::Real:
                 buffer << "je.r #0.0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
-                buffer << "mov.r #0.0," << $$ << "\n";
+                buffer << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
+                break;
         }
         buffer << "jump #" << symtable.at(afterZero).id << "\n";
         buffer << "#" << symtable.at(isZero).id << ":" << "\n";
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "mov.i #1," << $$ << "\n";
+                buffer << "mov.i #1," << toAddress(symtable.at($$)) << "\n";
+                break;
             case Type::Real:
-                buffer << "mov.r #1.0," << $$ << "\n";
+                buffer << "mov.r #1.0," << toAddress(symtable.at($$)) << "\n";
+                break;
         }
         buffer << "#" << symtable.at(afterZero).id << ":" << "\n";
     }
