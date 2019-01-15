@@ -20,6 +20,7 @@ volatile int localSize = 0;
 
 int callMethod(Symbol& sym);
 void emitAssignment(int lhs, int rhs);
+int emitExpression(std::string op, int lhs, int rhs);
 %}
 
 %token PROGRAM
@@ -311,15 +312,24 @@ simple_expression:
     term
     |
     SIGN term {
-
+        if($1 == Sign::Positive)
+            $$ = $2;
+        else {
+            $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
+            buffer << signSymbol(static_cast<Sign>($1)) << typeSuffix(symtable.at($$).type) << " "
+            << "#0 "
+            << toAddress(symtable.at($2)) << " "
+            << toAddress(symtable.at($$))
+            << "\n";
+        }
     }
     |
     simple_expression SIGN term {
-
+        $$ = emitExpression(signSymbol(static_cast<Sign>($2)), $1, $3);
     }
     |
     simple_expression OR term {
-
+        $$ = emitExpression("or", $1, $3);
     }
     ;
 
@@ -327,29 +337,7 @@ term:
     factor
     |
     term MULOP factor {
-        int lhs = $1;
-        int rhs = $3;
-        if(symtable.at($1).type == Type::Real || symtable.at($3).type == Type::Real) {
-            $$ = symtable.insertTemp(isGlobal, Type::Real);
-            if(symtable.at(lhs).type == Type::Integer) {
-                int temp = symtable.insertTemp(isGlobal, Type::Real);
-                emitAssignment(temp, lhs);
-                lhs = temp;
-            }
-            else {
-                int temp = symtable.insertTemp(isGlobal, Type::Real);
-                emitAssignment(temp, rhs);
-                rhs = temp;
-            }
-        }
-        else
-            $$ = symtable.insertTemp(isGlobal, Type::Integer);
-    
-        buffer << mulopSymbol(static_cast<Mulop>($2)) << typeSuffix(symtable.at($$).type) << " "
-        << toAddress(symtable.at(lhs)) << " "
-        << toAddress(symtable.at(rhs)) << " "
-        << toAddress(symtable.at($$))
-        << "\n";
+        $$ = emitExpression(mulopSymbol(static_cast<Mulop>($2)), $1, $3);
     }
     ;
 
@@ -476,4 +464,30 @@ void emitAssignment(int lhs, int rhs) {
             << toAddress(symtable.at(lhs))
             << "\n";
     }
+}
+
+int emitExpression(std::string op, int lhs, int rhs) {
+    int dst = 0;
+    if(symtable.at(lhs).type == Type::Real || symtable.at(rhs).type == Type::Real) {
+        dst = symtable.insertTemp(isGlobal, Type::Real);
+        if(symtable.at(lhs).type == Type::Integer) {
+            int temp = symtable.insertTemp(isGlobal, Type::Real);
+            emitAssignment(temp, lhs);
+            lhs = temp;
+        }
+        else {
+            int temp = symtable.insertTemp(isGlobal, Type::Real);
+            emitAssignment(temp, rhs);
+            rhs = temp;
+        }
+    }
+    else
+        dst = symtable.insertTemp(isGlobal, Type::Integer);
+
+    buffer << op << typeSuffix(symtable.at(dst).type) << " "
+    << toAddress(symtable.at(lhs)) << " "
+    << toAddress(symtable.at(rhs)) << " "
+    << toAddress(symtable.at(dst))
+    << "\n";
+    return dst;
 }
