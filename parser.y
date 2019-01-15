@@ -340,7 +340,6 @@ factor:
     |
     NOT factor {
         // $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
-
     }
     ;
 
@@ -384,7 +383,6 @@ int callMethod(Symbol& sym) {
 }
 
 void emitAssignment(int lhs, int rhs) {
-    std::cerr << "A1\n";
     if(symtable.at(lhs).type == symtable.at(rhs).type)
             buffer << "mov"
             << typeSuffix(symtable.at(lhs).type)
