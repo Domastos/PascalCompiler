@@ -1,4 +1,3 @@
-%option stdinit
 %option noyywrap
 
 %{
@@ -92,10 +91,18 @@ default             [\(\)\,\;\:\.\[\]]{1}
                     }
 {assignop}          {return ASSIGNOP;}
 {num}               {
-                    Symbol sym;
-                    sym.value = atof(yytext);
-                    sym.symbolType = SymbolType::Constant;
-                    yylval = symtable.insert(sym);
+                    yylval = symtable.lookup(std::string(yytext));
+                    if(yylval < 0) {
+                      Symbol sym;
+                      sym.value = atof(yytext);
+                      auto text = std::string(yytext);
+                      if(text.find('.') != std::string::npos || text.find('e') != std::string::npos)
+                        sym.type = Type::Real;
+                      else
+                        sym.type = Type::Integer;
+                      sym.token = NUM;
+                      yylval = symtable.insert(sym);
+                    }
                     return NUM;
                     }
 {id}                {
@@ -103,8 +110,10 @@ default             [\(\)\,\;\:\.\[\]]{1}
                     if(yylval < 0) { 
                       Symbol sym;
                       sym.id = std::string(yytext);
+                      sym.token = ID;
                       yylval = symtable.insert(sym);
                     }
-                    return ID;}
+                    return ID;
+                    }
 {default}           {return *yytext;}
 %%
