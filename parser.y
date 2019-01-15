@@ -256,21 +256,48 @@ statement:
     compound_statement
     |
     IF expression {
+        $1 = symtable.insertLabel(); // end of then
+        $$ = symtable.insertLabel(); // end of else
 
+        std::string zero = (symtable.at($2).type == Type::Real) ?
+                                std::string("#0.0") : 
+                                std::string("#0");
+        buffer << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($2).type) 
+                << " "
+                << zero
+                << ","
+                << toAddress(symtable.at($2))
+                << ","
+                << "#" << symtable.at($1).id
+                << "\n";
     } THEN statement {
-
+        buffer << "jump #" << symtable.at($$).id << "\n"; // skip else
+        buffer << "#" << symtable.at($1).id << ":" << "\n";
     } ELSE statement {
-
+        buffer << "#" << symtable.at($$).id << ":" << "\n";
     }
     |
     WHILE {
-
+        $1 = symtable.insertLabel(); // start
+        $$ = symtable.insertLabel(); // end
+        buffer << "#" << symtable.at($1).id << ":" << "\n";
     }
     expression DO {
-
+        std::string zero = (symtable.at($2).type == Type::Real) ?
+                                std::string("#0.0") : 
+                                std::string("#0");
+        buffer << relopSymbol(Relop::Equal) << typeSuffix(symtable.at($2).type) 
+                << " "
+                << zero
+                << ","
+                << toAddress(symtable.at($2))
+                << ","
+                << "#" << symtable.at($$).id
+                << "\n";
     }
     statement {
-
+        buffer << "jump #" << symtable.at($1).id << "\n"; // back to start
+        buffer << "#" << symtable.at($$).id << ":" << "\n"; // end
     }
     ;
 
@@ -361,8 +388,8 @@ expression:
         int isTrue = symtable.insertLabel();
         int afterTrue = symtable.insertLabel();
         buffer << relopSymbol(static_cast<Relop>($2)) << typeSuffix(symtable.at($$).type) << " "
-        << toAddress(symtable.at(lhs)) << " "
-        << toAddress(symtable.at(rhs)) << " "
+        << toAddress(symtable.at(lhs)) << ","
+        << toAddress(symtable.at(rhs)) << ","
         << "#" << symtable.at(isTrue).id
         << "\n";
         switch (symtable.at($2).type) {
@@ -396,8 +423,8 @@ simple_expression:
         else {
             $$ = symtable.insertTemp(isGlobal, symtable.at($2).type);
             buffer << signSymbol(static_cast<Sign>($1)) << typeSuffix(symtable.at($$).type) << " "
-            << "#0 "
-            << toAddress(symtable.at($2)) << " "
+            << "#0,"
+            << toAddress(symtable.at($2)) << ","
             << toAddress(symtable.at($$))
             << "\n";
         }
@@ -459,11 +486,11 @@ factor:
         int afterZero = symtable.insertLabel();
         switch (symtable.at($2).type) {
             case Type::Integer:
-                buffer << "je.i #0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "je.i #0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
                 buffer << "mov.i #0," << toAddress(symtable.at($$)) << "\n";
                 break;
             case Type::Real:
-                buffer << "je.r #0.0 " << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
+                buffer << "je.r #0.0," << toAddress(symtable.at($2)) << "#"+symtable.at(0).id << "\n";
                 buffer << "mov.r #0.0," << toAddress(symtable.at($$)) << "\n";
                 break;
         }
@@ -568,8 +595,8 @@ int emitExpression(std::string op, int lhs, int rhs) {
         dst = symtable.insertTemp(isGlobal, Type::Integer);
 
     buffer << op << typeSuffix(symtable.at(dst).type) << " "
-    << toAddress(symtable.at(lhs)) << " "
-    << toAddress(symtable.at(rhs)) << " "
+    << toAddress(symtable.at(lhs)) << ","
+    << toAddress(symtable.at(rhs)) << ","
     << toAddress(symtable.at(dst))
     << "\n";
     return dst;
