@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 #include "parser.hpp"
 
 enum Relop : int
@@ -33,28 +35,20 @@ enum Mulop : int
 
 enum class Type : int
 {
-    Integer,
-    IntegerReference,
-    Real,
-    RealReference,
-    Void // for procedures
-};
-
-enum class SymbolType : int
-{
-    Variable,
-    Function,
-    Label,
-    Constant
+    Integer = 1,
+    Real = 2,
+    Undefined = -1
 };
 
 struct Symbol {
     std::string id;
-    Type type;
-    SymbolType symbolType;
-    bool global;
-    int address;
-    double value;
+    Type type {Type::Undefined};
+    int token {ID};
+    bool reference {false};
+    bool global {true};
+    int address{0};
+    double value {0.0};
+    std::vector<Type> arguments;
 };
 
 class SymbolTable {
@@ -63,7 +57,10 @@ public:
   int lookupFunction(std::string id);
   int insert(Symbol symbol);
   void cleanLocal();
-  Symbol get(int i);
+  Symbol& at(int i);
+  int getSize(Symbol& sym);
+  int calculateAddress(bool global, int pos);
+  void print();
 
 private:
   std::vector<Symbol> symbols;
